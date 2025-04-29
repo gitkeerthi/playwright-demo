@@ -6,7 +6,7 @@ on:
     branches: [main, master]
 jobs:
   playwright-sharding-docker:
-    name: "Playwright Tests with sharding in docker"
+    name: "shard"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -14,7 +14,7 @@ jobs:
         shardIndex: [1, 2, 3, 4]
         shardTotal: [4]
     container:
-      image: mcr.microsoft.com/playwright:v1.48.1-jammy
+      image: mcr.microsoft.com/playwright:v1.52.0-jammy
       options: --user 1001
     steps:
       - uses: actions/checkout@v4
