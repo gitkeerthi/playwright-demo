@@ -21,4 +21,3 @@
 
 ### API
 
-`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`
