@@ -12,6 +12,6 @@ test('Checkboxes Test', async ({ page }) => {
 
   // Ensure the second checkbox is checked, then uncheck it
   await expect(checkboxes.nth(1)).toBeChecked();
-  await checkboxes.nth(1).uncheck();
+  await checkboxes.nth(1).check();
   await expect(checkboxes.nth(1)).not.toBeChecked();
 });
