@@ -27,7 +27,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.matrix.shard.length }}
+        run: npx playwright test --shard=${{ matrix.shard }}/4
 
       - name: Upload HTML report
         if: always()          # Upload report even if tests fail
@@ -37,22 +37,37 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  consolidate-reports:
+  merge-reports:
+    if: always()
     needs: test              # Depends on all test shards completing
     runs-on: ubuntu-latest
     steps:
-      - name: Download all shard reports
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Create results directory
+        run: mkdir -p playwright-report
+
+      - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          path: all-reports
+          path: all-artifacts
 
-      - name: Merge reports into single directory
+      - name: Merge reports
         run: |
-          mkdir -p combined-report
-          find all-reports -name 'index.html' -exec cp --parents {} combined-report \;
+          npx playwright merge-reports --config=playwright.config.js ./all-artifacts/playwright-report-*
 
-      - name: Upload combined report
+      - name: Upload merged report
         uses: actions/upload-artifact@v3
         with:
-          name: combined-playwright-report
-          path: combined-report
+          name: playwright-merged-report
+          path: playwright-report
+          retention-days: 7
