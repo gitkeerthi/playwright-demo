@@ -65,7 +65,15 @@ jobs:
 
       - name: Merge reports
         run: |
-          npx playwright merge-reports --config=playwright.config.js ./all-artifacts/playwright-report-*
+          # List available artifacts
+          ls -la all-artifacts/
+          
+          # Create simple config file if it doesn't exist
+          if [ ! -f "playwright.config.js" ]; then
+            echo "module.exports = { reporter: 'html' };" > playwright.config.js
+          fi
+          
+          npx playwright merge-reports --config=playwright.config.js ./all-artifacts/
 
       - name: Upload merged report
         uses: actions/upload-artifact@v4
