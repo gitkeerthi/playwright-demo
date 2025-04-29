@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload HTML report
         if: always()          # Upload report even if tests fail
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
@@ -57,16 +57,18 @@ jobs:
         run: mkdir -p playwright-report
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: all-artifacts
+          pattern: playwright-report-*
+          merge-multiple: true
 
       - name: Merge reports
         run: |
           npx playwright merge-reports --config=playwright.config.js ./all-artifacts/playwright-report-*
 
       - name: Upload merged report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-merged-report
           path: playwright-report
