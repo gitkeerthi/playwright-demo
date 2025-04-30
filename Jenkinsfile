@@ -1,5 +1,9 @@
 pipeline {
-    agent none
+    agent any
+
+    tools {
+        nodejs 'NodeJS'
+    }
 
     environment {
         CI = 'true' // ensures blob reporter and proper config behavior
