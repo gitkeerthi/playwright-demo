@@ -53,7 +53,7 @@ pipeline {
             // Combine all blob reports from shards
             sh '''
                 mkdir -p combined-blob-report
-                find . -path "*/blob-report/*.json" -exec cp {} combined-blob-report/ \;
+                find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;
             '''
 
             // Archive the combined blob report
@@ -61,7 +61,7 @@ pipeline {
 
             // Generate and publish HTML report from combined blob reports
             script {
-                if (fileExists('combined-blob-report/')) {
+                if (fileExists('combined-blob-report')) {
                     sh 'npx playwright merge-reports ./combined-blob-report/ --reporter html'
                     publishHTML(target: [
                         allowMissing: true,
