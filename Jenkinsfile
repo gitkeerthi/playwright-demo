@@ -86,7 +86,7 @@ pipeline {
                 reportName: 'Playwright Merged Report'
             ])
 
-            archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm,**/.playwright/**/*,blob-report-*/**'', allowEmptyArchive: true
+            archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm,**/.playwright/**/*,blob-report-*/**', allowEmptyArchive: true
         }
     }
 }
