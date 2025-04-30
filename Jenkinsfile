@@ -6,10 +6,26 @@ pipeline {
     }
 
     parameters {
-        integerParam(name: 'SHARD_COUNT', defaultValue: 4, description: 'Number of shards to split tests across')
+        string(name: 'SHARD_COUNT', defaultValue: '4', description: 'Number of shards to split tests across (1-8)')
     }
 
     stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    // Validate SHARD_COUNT is a number between 1-8
+                    try {
+                        env.VALIDATED_SHARD_COUNT = params.SHARD_COUNT.toInteger()
+                        if (env.VALIDATED_SHARD_COUNT < 1 || env.VALIDATED_SHARD_COUNT > 8) {
+                            error("SHARD_COUNT must be between 1 and 8")
+                        }
+                    } catch (NumberFormatException e) {
+                        error("SHARD_COUNT must be a valid number")
+                    }
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -23,26 +39,20 @@ pipeline {
         }
 
         stage('Run Tests') {
-            parallel {
-                stage('Shard 1') {
-                    steps {
-                        runShard(shardIndex: 0, shardTotal: params.SHARD_COUNT)
+            steps {
+                script {
+                    // Dynamically generate parallel stages based on shard count
+                    def shardCount = env.VALIDATED_SHARD_COUNT.toInteger()
+                    def parallelStages = [:]
+
+                    for (int i = 0; i < shardCount; i++) {
+                        def shardIndex = i
+                        parallelStages["Shard ${i + 1}"] = {
+                            runShard(shardIndex: shardIndex, shardTotal: shardCount)
+                        }
                     }
-                }
-                stage('Shard 2') {
-                    steps {
-                        runShard(shardIndex: 1, shardTotal: params.SHARD_COUNT)
-                    }
-                }
-                stage('Shard 3') {
-                    steps {
-                        runShard(shardIndex: 2, shardTotal: params.SHARD_COUNT)
-                    }
-                }
-                stage('Shard 4') {
-                    steps {
-                        runShard(shardIndex: 3, shardTotal: params.SHARD_COUNT)
-                    }
+
+                    parallel parallelStages
                 }
             }
         }
