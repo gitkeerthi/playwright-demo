@@ -6,14 +6,23 @@ pipeline {
     }
 
     stages {
+        // Global setup for Node.js tools and dependencies
+        stage('Setup NodeJS and Install Dependencies') {
+            agent any
+            steps {
+                checkout scm
+                withNodejs('NodeJS') {
+                    sh 'npm ci'
+                    sh 'npx playwright install'
+                }
+            }
+        }
+
         stage('Parallel Test Shards') {
             parallel {
                 stage('Shard 1 of 3') {
                     agent any
                     steps {
-                        checkout scm
-                        sh 'npm ci'
-                        sh 'npx playwright install'
                         sh '''
                             npx playwright test --shard=1/3
                             mv blob-report blob-report-1
@@ -25,9 +34,6 @@ pipeline {
                 stage('Shard 2 of 3') {
                     agent any
                     steps {
-                        checkout scm
-                        sh 'npm ci'
-                        sh 'npx playwright install'
                         sh '''
                             npx playwright test --shard=2/3
                             mv blob-report blob-report-2
@@ -39,9 +45,6 @@ pipeline {
                 stage('Shard 3 of 3') {
                     agent any
                     steps {
-                        checkout scm
-                        sh 'npm ci'
-                        sh 'npx playwright install'
                         sh '''
                             npx playwright test --shard=3/3
                             mv blob-report blob-report-3
@@ -78,7 +81,7 @@ pipeline {
                 reportName: 'Playwright Merged Report'
             ])
 
-            archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm,**/.playwright/**/*', allowEmptyArchive: true
+            archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm,**/.playwright/**/*, blob-report-*/**', allowEmptyArchive: true
         }
     }
 }
