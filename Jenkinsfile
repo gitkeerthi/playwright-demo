@@ -29,15 +29,15 @@ pipeline {
                                 sh "npx playwright test --shard=${shardIndex}/3"
                             }
                         }
-                        stage('Merge Reports') {
-                            steps {
-                                sh 'npx playwright merge-reports --reporter html blob-report/'
-                            }
-                        }
                     }
                     parallel shards
                 }
             }
+        }
+    }
+    stage('Merge Reports') {
+        steps {
+            sh 'npx playwright merge-reports --reporter html blob-report/'
         }
     }
 
