@@ -1,53 +1,51 @@
 pipeline {
-  agent {
-    docker {
-      image 'mcr.microsoft.com/playwright:v1.52.0-noble'
-      args '-u root'
-    }
-  }
+    agent any
 
-  environment {
-    CI = 'true' // Enables CI-specific behavior in Playwright config
-  }
-
-  stages {
-    stage('Install Dependencies') {
-      steps {
-        sh 'rm -rf node_modules && npm ci'
-        sh 'npx playwright install --with-deps'
-      }
+    tools {
+        nodejs 'NodeJS' // Use the NodeJS installation you configured in Jenkins
     }
 
-    stage('Run Playwright Tests') {
-      steps {
-        sh 'rm -rf playwright-report .blob-report'
-        sh 'npx playwright test'
-      }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+                sh 'npx playwright install --with-deps'
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                // Set CI environment variable to true for proper reporter configuration
+                withEnv(['CI=true']) {
+                    sh 'npx playwright test'
+                }
+            }
+        }
     }
 
-    stage('Generate HTML Report from Blob') {
-      steps {
-        sh 'npx playwright show-report --reporter=blob --output=playwright-report'
-      }
-    }
+    post {
+        always {
+            // Archive the blob report
+            archiveArtifacts artifacts: 'blob-report/**/*', allowEmptyArchive: true
 
-    stage('Archive and Publish Report') {
-      steps {
-        archiveArtifacts artifacts: 'playwright-report/**/*', fingerprint: true
+            // Archive the HTML report if available (for local runs)
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'playwright-report',
+                reportFiles: 'index.html',
+                reportName: 'Playwright Report'
+            ])
 
-        publishHTML(target: [
-          reportDir: 'playwright-report',
-          reportFiles: 'index.html',
-          reportName: 'Playwright Test Report',
-          allowMissing: false
-        ])
-      }
+            // Archive any screenshots and videos
+            archiveArtifacts artifacts: 'test-results/**/*.png,test-results/**/*.webm', allowEmptyArchive: true
+        }
     }
-  }
-
-  post {
-    always {
-      echo 'Playwright E2E pipeline completed.'
-    }
-  }
 }
