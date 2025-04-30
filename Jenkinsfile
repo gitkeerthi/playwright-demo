@@ -14,7 +14,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npx playwright install --with-deps'
+                sh 'npx playwright install'
             }
         }
 
