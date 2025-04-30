@@ -11,6 +11,13 @@ pipeline {
                 checkout scm
             }
         }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npx playwright install --with-deps'
+            }
+        }
+
         stage('Run Tests') {
             steps {
                 // Set CI environment variable to true for proper reporter configuration
