@@ -34,7 +34,6 @@ pipeline {
                 }
             }
         }
-        }
         stage('Merge Reports') {
             steps {
                 sh 'npx playwright merge-reports --reporter html blob-report/'
