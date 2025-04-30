@@ -6,7 +6,7 @@ pipeline {
     }
 
     parameters {
-        int(name: 'SHARD_COUNT', defaultValue: 4, description: 'Number of shards to split tests across')
+        integerParam(name: 'SHARD_COUNT', defaultValue: 4, description: 'Number of shards to split tests across')
     }
 
     stages {
@@ -53,7 +53,7 @@ pipeline {
             // Combine all blob reports from shards
             sh '''
                 mkdir -p combined-blob-report
-                find . -path "*/blob-report/*.json" -exec cp {} combined-blob-report/ \\;
+                find . -path "*/blob-report/*.json" -exec cp {} combined-blob-report/ \;
             '''
 
             // Archive the combined blob report
