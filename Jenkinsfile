@@ -13,6 +13,11 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
+                    // Set default value if parameter is empty
+                    if (!params.SHARD_COUNT?.trim()) {
+                        params.SHARD_COUNT = '4'
+                    }
+
                     // Validate SHARD_COUNT is a number between 1-8
                     try {
                         env.VALIDATED_SHARD_COUNT = params.SHARD_COUNT.toInteger()
@@ -20,7 +25,7 @@ pipeline {
                             error("SHARD_COUNT must be between 1 and 8")
                         }
                     } catch (NumberFormatException e) {
-                        error("SHARD_COUNT must be a valid number")
+                        error("SHARD_COUNT must be a valid number between 1 and 8")
                     }
                 }
             }
@@ -41,7 +46,6 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    // Dynamically generate parallel stages based on shard count
                     def shardCount = env.VALIDATED_SHARD_COUNT.toInteger()
                     def parallelStages = [:]
 
@@ -60,18 +64,19 @@ pipeline {
 
     post {
         always {
-            // Combine all blob reports from shards
-            sh '''
-                mkdir -p combined-blob-report
-                find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;
-            '''
-
-            // Archive the combined blob report
-            archiveArtifacts artifacts: 'combined-blob-report/**/*', allowEmptyArchive: true
-
-            // Generate and publish HTML report from combined blob reports
             script {
-                if (fileExists('combined-blob-report')) {
+                // Combine all blob reports from shards
+                sh '''
+                    mkdir -p combined-blob-report
+                    find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;
+                '''
+
+                // Archive the combined blob report
+                archiveArtifacts artifacts: 'combined-blob-report/**/*', allowEmptyArchive: true
+
+                // Generate and publish HTML report if we have any blob reports
+                def blobFiles = findFiles(glob: 'combined-blob-report/*.json')
+                if (blobFiles.length > 0) {
                     sh 'npx playwright merge-reports ./combined-blob-report/ --reporter html'
                     publishHTML(target: [
                         allowMissing: true,
@@ -82,17 +87,16 @@ pipeline {
                         reportName: 'Playwright Report'
                     ])
                 }
-            }
 
-            // Archive any screenshots and videos from all shards
-            archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm', allowEmptyArchive: true
+                // Archive any screenshots and videos from all shards
+                archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm', allowEmptyArchive: true
+            }
         }
     }
 }
 
 def runShard(Map args) {
     withEnv(['CI=true']) {
-        // Create unique output directories for each shard
         def shardDir = "shard-${args.shardIndex}"
 
         sh """
