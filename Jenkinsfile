@@ -13,14 +13,18 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    // Set default if empty and validate
-                    def shardCount = params.SHARD_COUNT ?: '4'
+                    // First check if parameter exists and has value
+                    if (!params.SHARD_COUNT?.trim()) {
+                        params.SHARD_COUNT = '4'
+                    }
+
+                    // Then validate it's a proper number
                     try {
-                        env.VALIDATED_SHARD_COUNT = shardCount.toInteger()
+                        env.VALIDATED_SHARD_COUNT = params.SHARD_COUNT.toInteger()
                         if (env.VALIDATED_SHARD_COUNT < 1 || env.VALIDATED_SHARD_COUNT > 8) {
                             error("SHARD_COUNT must be between 1 and 8")
                         }
-                    } catch (Exception e) {
+                    } catch (NumberFormatException e) {
                         error("SHARD_COUNT must be a valid number between 1 and 8")
                     }
                 }
@@ -35,7 +39,6 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm ci'
                 sh 'npx playwright install'
             }
         }
@@ -46,10 +49,9 @@ pipeline {
                     def shardCount = env.VALIDATED_SHARD_COUNT.toInteger()
                     def parallelStages = [:]
 
-                    for (int i = 0; i < shardCount; i++) {
-                        def index = i
+                    (0..<shardCount).each { i ->
                         parallelStages["Shard ${i + 1}"] = {
-                            runShard(shardIndex: index, shardTotal: shardCount)
+                            runShard(shardIndex: i, shardTotal: shardCount)
                         }
                     }
 
@@ -62,17 +64,20 @@ pipeline {
     post {
         always {
             script {
-                // Combine all blob reports
-                sh 'mkdir -p combined-blob-report'
-                sh 'find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;'
+                // Create directory for combined reports
+                sh 'mkdir -p combined-blob-report || true'
 
-                // Archive combined reports
+                // Find and copy all blob reports
+                sh '''
+                    find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \; || true
+                '''
+
+                // Archive the combined reports
                 archiveArtifacts artifacts: 'combined-blob-report/**/*', allowEmptyArchive: true
 
-                // Check if we have any reports using shell command
-                def hasReports = sh(script: 'test -n "$(ls combined-blob-report/*.json 2>/dev/null)"', returnStatus: true) == 0
-
-                if (hasReports) {
+                // Check if any reports exist using shell
+                def reportCheck = sh(script: 'ls combined-blob-report/*.json 2>/dev/null | wc -l', returnStdout: true).trim()
+                if (reportCheck != "0") {
                     sh 'npx playwright merge-reports ./combined-blob-report/ --reporter html'
                     publishHTML(target: [
                         allowMissing: true,
@@ -84,7 +89,7 @@ pipeline {
                     ])
                 }
 
-                // Archive test results
+                // Archive all test results
                 archiveArtifacts artifacts: '**/test-results/**/*', allowEmptyArchive: true
             }
         }
