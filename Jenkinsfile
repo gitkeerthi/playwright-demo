@@ -13,18 +13,14 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    // Set default value if parameter is empty
-                    if (!params.SHARD_COUNT?.trim()) {
-                        params.SHARD_COUNT = '4'
-                    }
-
-                    // Validate SHARD_COUNT is a number between 1-8
+                    // Set default if empty and validate
+                    def shardCount = params.SHARD_COUNT ?: '4'
                     try {
-                        env.VALIDATED_SHARD_COUNT = params.SHARD_COUNT.toInteger()
+                        env.VALIDATED_SHARD_COUNT = shardCount.toInteger()
                         if (env.VALIDATED_SHARD_COUNT < 1 || env.VALIDATED_SHARD_COUNT > 8) {
                             error("SHARD_COUNT must be between 1 and 8")
                         }
-                    } catch (NumberFormatException e) {
+                    } catch (Exception e) {
                         error("SHARD_COUNT must be a valid number between 1 and 8")
                     }
                 }
@@ -39,6 +35,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
+                sh 'npm ci'
                 sh 'npx playwright install'
             }
         }
@@ -50,9 +47,9 @@ pipeline {
                     def parallelStages = [:]
 
                     for (int i = 0; i < shardCount; i++) {
-                        def shardIndex = i
+                        def index = i
                         parallelStages["Shard ${i + 1}"] = {
-                            runShard(shardIndex: shardIndex, shardTotal: shardCount)
+                            runShard(shardIndex: index, shardTotal: shardCount)
                         }
                     }
 
@@ -65,18 +62,17 @@ pipeline {
     post {
         always {
             script {
-                // Combine all blob reports from shards
-                sh '''
-                    mkdir -p combined-blob-report
-                    find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;
-                '''
+                // Combine all blob reports
+                sh 'mkdir -p combined-blob-report'
+                sh 'find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \\;'
 
-                // Archive the combined blob report
+                // Archive combined reports
                 archiveArtifacts artifacts: 'combined-blob-report/**/*', allowEmptyArchive: true
 
-                // Generate and publish HTML report if we have any blob reports
-                def blobFiles = findFiles(glob: 'combined-blob-report/*.json')
-                if (blobFiles.length > 0) {
+                // Check if we have any reports using shell command
+                def hasReports = sh(script: 'test -n "$(ls combined-blob-report/*.json 2>/dev/null)"', returnStatus: true) == 0
+
+                if (hasReports) {
                     sh 'npx playwright merge-reports ./combined-blob-report/ --reporter html'
                     publishHTML(target: [
                         allowMissing: true,
@@ -88,8 +84,8 @@ pipeline {
                     ])
                 }
 
-                // Archive any screenshots and videos from all shards
-                archiveArtifacts artifacts: '**/test-results/**/*.png,**/test-results/**/*.webm', allowEmptyArchive: true
+                // Archive test results
+                archiveArtifacts artifacts: '**/test-results/**/*', allowEmptyArchive: true
             }
         }
     }
@@ -98,12 +94,12 @@ pipeline {
 def runShard(Map args) {
     withEnv(['CI=true']) {
         def shardDir = "shard-${args.shardIndex}"
-
         sh """
             mkdir -p ${shardDir}
-            npx playwright test --shard=${args.shardIndex + 1}/${args.shardTotal} \
-                               --output=${shardDir}/test-results \
-                               --reporter=blob,${shardDir}/blob-report/blob.json
+            npx playwright test \
+                --shard=${args.shardIndex + 1}/${args.shardTotal} \
+                --output=${shardDir}/test-results \
+                --reporter=blob,${shardDir}/blob-report/blob.json
         """
     }
 }
