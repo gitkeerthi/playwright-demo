@@ -20,9 +20,22 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                // Set CI environment variable to true for proper reporter configuration
-                withEnv(['CI=true']) {
-                    sh 'npx playwright test'
+                script {
+                    def shards = [:]
+                    for (int i = 1; i <= 3; i++) {
+                        def shardIndex = i
+                        shards["shard${shardIndex}"] = {
+                            withEnv(['CI=true']) {
+                                sh "npx playwright test --shard=${shardIndex}/3"
+                            }
+                        }
+                        stage('Merge Reports') {
+                            steps {
+                                sh 'npx playwright merge-reports --reporter html blob-report/'
+                            }
+                        }
+                    }
+                    parallel shards
                 }
             }
         }
