@@ -25,7 +25,7 @@ pipeline {
                     for (int i = 1; i <= 3; i++) {
                         def shardIndex = i
                         shards["shard${shardIndex}"] = {
-                            node('any') {
+                            node {
                                 withEnv(['CI=true']) {
                                     sh "npx playwright test --shard=${shardIndex}/3"
                                 }
