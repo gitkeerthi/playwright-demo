@@ -13,12 +13,9 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    // First check if parameter exists and has value
                     if (!params.SHARD_COUNT?.trim()) {
                         params.SHARD_COUNT = '4'
                     }
-
-                    // Then validate it's a proper number
                     try {
                         env.VALIDATED_SHARD_COUNT = params.SHARD_COUNT.toInteger()
                         if (env.VALIDATED_SHARD_COUNT < 1 || env.VALIDATED_SHARD_COUNT > 8) {
@@ -39,7 +36,8 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npx playwright install'
+                sh 'npm ci'
+                sh 'npx playwright install --with-deps'
             }
         }
 
@@ -65,19 +63,21 @@ pipeline {
         always {
             script {
                 // Create directory for combined reports
-                sh 'mkdir -p combined-blob-report || true'
+                sh 'mkdir -p combined-blob-report'
 
-                // Find and copy all blob reports
-                sh '''
-                    find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ \; || true
-                '''
+                // Find and copy all blob reports (fixed escaping)
+                sh 'find . -path "*/blob-report/*.json" -exec cp -- "{}" combined-blob-report/ ";"'
 
                 // Archive the combined reports
                 archiveArtifacts artifacts: 'combined-blob-report/**/*', allowEmptyArchive: true
 
-                // Check if any reports exist using shell
-                def reportCheck = sh(script: 'ls combined-blob-report/*.json 2>/dev/null | wc -l', returnStdout: true).trim()
-                if (reportCheck != "0") {
+                // Check if any reports exist
+                def hasReports = sh(
+                    script: 'test $(ls combined-blob-report/*.json 2>/dev/null | wc -l) -gt 0',
+                    returnStatus: true
+                ) == 0
+
+                if (hasReports) {
                     sh 'npx playwright merge-reports ./combined-blob-report/ --reporter html'
                     publishHTML(target: [
                         allowMissing: true,
